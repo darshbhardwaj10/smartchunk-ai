@@ -1,5 +1,6 @@
 """FastAPI API, request validation, document ingestion, and engine integration."""
 from __future__ import annotations
+from fastapi.responses import Response
 
 import os
 from pathlib import Path, PurePosixPath
