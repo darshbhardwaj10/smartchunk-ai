@@ -1,0 +1,16 @@
+cat >> .gitignore <<'EOF'
+
+# Python generated files
+__pycache__/
+*.py[cod]
+.venv/
+
+# Frontend generated files
+frontend/node_modules/
+frontend/dist/
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+EOF
