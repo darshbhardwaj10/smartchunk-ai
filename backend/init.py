@@ -1,0 +1,1 @@
+"""SmartChunk AI backend package."""
