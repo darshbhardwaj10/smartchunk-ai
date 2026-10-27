@@ -1,0 +1,21 @@
+{
+  "name": "SmartChunk AI",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    }
+  },
+  "forwardPorts": [8000, 5173],
+  "portsAttributes": {
+    "8000": {
+      "label": "SmartChunk API",
+      "onAutoForward": "notify"
+    },
+    "5173": {
+      "label": "SmartChunk Frontend",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "postCreateCommand": "python -m venv .venv && .venv/bin/python -m pip install --upgrade pip && .venv/bin/python -m pip install -r requirements-dev.txt && cd frontend && npm install"
+}
