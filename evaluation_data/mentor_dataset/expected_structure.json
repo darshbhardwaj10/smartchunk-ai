@@ -1,0 +1,51 @@
+{
+  "dataset_type": "synthetic document chunking evaluation corpus",
+  "default_chunk_size_characters": 700,
+  "default_overlap_characters": 80,
+  "documents": {
+    "01_structure_stress_test.md": {
+      "expected_headings": [
+        "Incident priority reference",
+        "Incident identifier handling",
+        "First-response checklist",
+        "Account access recovery",
+        "Frequently asked questions"
+      ],
+      "expected_types": [
+        "table",
+        "code",
+        "list"
+      ],
+      "expected_duplicate_topic": "Repeated notice test",
+      "purpose": "Stress test for structures near chunk boundaries; table and code blocks are intentionally long."
+    },
+    "02_api_integration_guide.md": {
+      "expected_headings": [
+        "Endpoint reference",
+        "Request example",
+        "Response contract",
+        "Error handling"
+      ],
+      "expected_types": [
+        "table",
+        "code"
+      ],
+      "purpose": "Technical API documentation with a table and code examples."
+    },
+    "03_student_data_policy.md": {
+      "expected_headings": [
+        "Data minimization",
+        "Roles and responsibilities",
+        "Retention schedule",
+        "Handling workflow"
+      ],
+      "expected_types": [
+        "table",
+        "list"
+      ],
+      "expected_duplicate_topic": "Repeated content example",
+      "purpose": "Policy-style content for heading, list, table, and duplicate checks."
+    }
+  },
+  "scoring_guidance": "Do not expect perfect scores. Read README_DATASET.md for the definitions of the metrics."
+}

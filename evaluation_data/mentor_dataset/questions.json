@@ -1,0 +1,62 @@
+[
+  {
+    "question": "What should support staff never ask a user to send?",
+    "expected_source": "01_structure_stress_test.md",
+    "expected_topic": "Account access recovery"
+  },
+  {
+    "question": "What information should be recorded for an incident?",
+    "expected_source": "01_structure_stress_test.md",
+    "expected_topic": "First-response checklist"
+  },
+  {
+    "question": "What does P1 mean for the campus identity provider?",
+    "expected_source": "01_structure_stress_test.md",
+    "expected_topic": "Incident priority reference"
+  },
+  {
+    "question": "What does the incident identifier normalization function validate?",
+    "expected_source": "01_structure_stress_test.md",
+    "expected_topic": "Incident identifier handling"
+  },
+  {
+    "question": "How should users report a missing grade?",
+    "expected_source": "01_structure_stress_test.md",
+    "expected_topic": "Frequently asked questions"
+  },
+  {
+    "question": "Which endpoint returns chunk records and metrics?",
+    "expected_source": "02_api_integration_guide.md",
+    "expected_topic": "Endpoint reference"
+  },
+  {
+    "question": "What form fields are sent to the process endpoint?",
+    "expected_source": "02_api_integration_guide.md",
+    "expected_topic": "Request example"
+  },
+  {
+    "question": "What does the oversized flag indicate?",
+    "expected_source": "02_api_integration_guide.md",
+    "expected_topic": "Response contract"
+  },
+  {
+    "question": "Which HTTP status represents an unsupported file extension?",
+    "expected_source": "02_api_integration_guide.md",
+    "expected_topic": "Error handling"
+  },
+  {
+    "question": "What information should not be included in a support ticket?",
+    "expected_source": "03_student_data_policy.md",
+    "expected_topic": "Data minimization"
+  },
+  {
+    "question": "How long is the suggested test retention for sanitized diagnostic logs?",
+    "expected_source": "03_student_data_policy.md",
+    "expected_topic": "Retention schedule"
+  },
+  {
+    "question": "What is the correct workflow for handling support data?",
+    "expected_source": "03_student_data_policy.md",
+    "expected_topic": "Handling workflow"
+  }
+]

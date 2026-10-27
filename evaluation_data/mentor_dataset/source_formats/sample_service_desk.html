@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Service Desk HTML Test Fixture</title><style>.hidden{display:none}</style></head>
+<body>
+<header><h1>HTML Normalization Fixture</h1></header>
+<main>
+<section><h2>Escalation procedure</h2><p>Escalate a suspected service-wide outage after confirming the service status and recording the time of the failure.</p>
+<ol><li>Check the status page.</li><li>Record a sanitized error message.</li><li>Notify the assigned service owner.</li></ol></section>
+<section><h2>Support categories</h2><table><thead><tr><th>Category</th><th>Owner</th><th>Target</th></tr></thead><tbody><tr><td>Account access</td><td>Identity support</td><td>Same business day</td></tr><tr><td>Network access</td><td>Network support</td><td>Within 30 minutes for broad impact</td></tr><tr><td>Software request</td><td>Endpoint support</td><td>Scheduled queue</td></tr></tbody></table></section>
+<section><h2>Example snippet</h2><pre><code class="language-python">def sanitize_message(message: str) -> str:
+    """Remove leading/trailing whitespace for display."""
+    return " ".join(message.split())
+</code></pre></section>
+<script>console.log("This script must not appear in normalized text.")</script>
+</main></body></html>
