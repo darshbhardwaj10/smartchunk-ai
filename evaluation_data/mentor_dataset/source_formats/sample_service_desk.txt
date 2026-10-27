@@ -1,0 +1,11 @@
+DOCUMENT: Sample Service Desk Notes
+PURPOSE: Validate TXT extraction and normalization.
+
+TOPIC: Account Access
+Users should never share passwords or authentication tokens. The support team verifies identity using the approved process before performing an account recovery.
+
+TOPIC: Network Outage
+Collect the affected service name, approximate start time, user impact, and a sanitized error message. Do not include secrets in diagnostic notes.
+
+TOPIC: Benchmarking
+Run the same document through both chunking strategies. Inspect structure preservation and report the measured result rather than assuming one strategy always wins.
