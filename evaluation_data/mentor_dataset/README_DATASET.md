@@ -1,44 +1,73 @@
-# SmartChunk Mentor Demo Dataset
+# SmartChunk Evaluation Dataset
 
 ## Purpose
-This is a **synthetic** evaluation corpus designed for the SmartChunk AI hackathon demo. It is not an official university document or real student data. It deliberately includes Markdown headings, prose, lists, tables, fenced code, duplicate notices, HTML, plain text, DOCX, and a multi-page PDF with repeated margin lines.
 
-## Recommended live demo
-1. Open the application and set `chunk_size=700`, `overlap=80`, `semantic=false`.
-2. Upload `documents/01_structure_stress_test.md` and compare the fixed-size baseline against SmartChunk.
-3. Inspect actual table/code chunks, heading paths, `chunk_type`, and the `oversized` flag.
-4. Upload `documents/02_api_integration_guide.md` and `documents/03_student_data_policy.md` as additional cases.
-5. Test `source_formats/sample_service_desk.html`, `source_formats/sample_service_desk.txt`, `source_formats/sample_equipment_return.docx`, and `source_formats/repeated_page_margins.pdf` through `/normalize`.
-6. Run the benchmark script and report its output honestly.
+This is a **synthetic** evaluation corpus for development and hackathon demonstration. It is not an official university document and contains no real student information. It includes realistic-looking Markdown structures and normalization fixtures for HTML, TXT, DOCX and a text-based PDF with repeated page margins.
 
-## Run benchmark script
-Run from the **main `smartchunk-ai` project root** after installing backend dependencies:
+## Run the complete offline evaluation
+
+From the repository root, after installing backend dependencies:
 
 ```bash
-python evaluation_data/mentor_dataset/run_chunking_benchmark.py
+python evaluation_data/evaluate.py --chunk-size 700 --overlap 80
 ```
 
-The script compares fixed-size and structure-aware chunking on the three Markdown documents and all source-format fixtures. It writes `benchmark_results.json` and `benchmark_results.csv` into this folder. It reports chunk counts, size metrics, oversized chunks, structural block integrity for tables/code/lists, normalized PDF margin removals, and a small lexical expected-source/topic Hit@3 and MRR diagnostic.
+This runs the core baseline-vs-SmartChunk benchmark, controlled mutation cases, format-normalization fixtures and a security-fixture diagnostic. Outputs are written under `evaluation_data/results/`. Security fixture results intentionally do not mean that the current application is secure; they report whether the normalizer exposes security-specific warnings.
 
-Optional settings:
+Run one component at a time:
 
 ```bash
-python evaluation_data/mentor_dataset/run_chunking_benchmark.py --chunk-size 700 --overlap 80
+python evaluation_data/evaluate.py --suite chunking
+python evaluation_data/evaluate.py --suite mutations
+python evaluation_data/evaluate.py --suite security
 ```
 
-## Metrics and limitations
-- **Structural block integrity:** a source table, fenced code block, or list is counted as intact if the entire extracted block appears inside at least one generated chunk. This is a simple deterministic proxy, not a general document-understanding score.
-- **Expected source/topic Hit@3:** a simple lexical ranking over labelled questions; a hit requires a relevant source/topic match among the top three ranked chunks.
-- **MRR:** mean reciprocal rank of the first chunk that matches the labelled source/topic; questions without a match contribute zero. It is based on lexical ranking, not embedding retrieval or answer accuracy.
-- **Oversized chunks:** SmartChunk may preserve a structural block intact even when it exceeds the configured chunk size; this is an explicit trade-off recorded by an `oversized` flag.
-- **Near duplicates:** the engine's existing conservative lexical detector may miss paraphrases or remove some similar content. Review output manually.
-- **PDF extraction:** the PDF fixture tests repeated page margins only for text-based PDFs. Scanned PDFs require OCR and are not covered.
-- All results must be measured by running the script. No performance improvement is guaranteed in advance.
+Run the evaluation and backend workflow tests:
 
-## Dataset files
-- `documents/`: three Markdown documents for baseline comparison.
-- `source_formats/`: HTML, TXT, DOCX, and PDF fixtures for normalization tests.
-- `questions.json`: hand-labelled question/source/topic test set.
-- `expected_structure.json`: structural expectations per document.
-- `evaluation_rubric.json`: consistent metric definitions and comparison rules.
-- `run_chunking_benchmark.py`: deterministic benchmark script.
+```bash
+python -m pytest -q
+```
+
+The API workflow tests require the updated backend modules (`storage.py`, `retrieval.py`, `qa.py`, `llm_provider.py`, `safesync.py`, and `incident_replay.py`). They use a temporary SQLite store and do not call an external LLM.
+
+## Dataset contents
+
+- `documents/`: four synthetic Markdown documents. The fourth contains cross-section evidence, role-based durations, exceptions and retention rules.
+- `source_formats/`: HTML, TXT, DOCX and PDF normalizer fixtures.
+- `questions.json`: single-source/topic retrieval questions.
+- `multi_evidence_cases.json`: multi-passage questions with manually labelled required evidence spans.
+- `expected_structure.json`: heading and structural expectations.
+- `evaluation_rubric.json`: definitions and fair-comparison rules.
+- `mutation_cases.json`: controlled whitespace, duplication, deletion, reference and caption mutations.
+- `security_cases/` plus `security_cases.json`: benign and suspicious-instruction fixtures. These are test inputs, not a security certification.
+- `qa_cases.json`: Q&A acceptance scenarios for citations, evidence retrieval and abstention.
+- `safesync_cases.json`: candidate publication scenarios.
+- `run_chunking_benchmark.py`: baseline/SmartChunk benchmark runner.
+
+## Metrics
+
+- **Structural integrity:** a source table, fenced code block or list is intact if its full normalized text appears in at least one output chunk. This does not prove semantic correctness.
+- **Size compliance:** fraction of chunks not marked oversized. Oversized structural blocks can be an intentional trade-off.
+- **Source metadata coverage:** fraction of chunks with both source filename and source location.
+- **Hit@3:** one expected source/topic match appears in the top three lexical retrieval results.
+- **MRR@20:** mean reciprocal rank of the first expected source/topic match within the top 20 ranked results.
+- **Evidence Coverage@k:** proportion of manually labelled evidence spans found in retrieved chunks.
+- **Evidence Completeness@k:** proportion of multi-evidence questions for which all required spans are found in the top-k retrieved chunks.
+- **Processing time:** median wall-clock time over repeated chunking runs; compare on the same host and settings.
+
+The evidence metrics use exact normalized text-span matching against retrieved chunks. All evidence spans must be manually checked against their source documents. Lexical retrieval metrics are not semantic retrieval quality and neither retrieval metrics nor source metadata alone prove generated answer correctness.
+
+## Mutation and security interpretation
+
+Mutation cases probe output behavior under controlled changes. A case with `capability_required` records a known capability gap if the current chunk schema cannot expose or validate that behavior; it is not silently marked as passed.
+
+Security fixtures check whether specific security warnings are emitted. No warning does **not** mean a document is safe. Access control must be enforced by a downstream identity-aware retrieval application, and LLM prompt-injection resistance requires separate end-to-end testing.
+
+## Fair comparison rules
+
+1. Use the same source document, question set, chunk size and overlap for baseline and SmartChunk.
+2. Keep semantic mode disabled for the default baseline comparison unless both configurations explicitly enable and document it.
+3. Manually verify expected source snippets and question evidence before publishing results.
+4. Report missing evidence, oversized blocks, warnings and regressions as well as successful cases.
+5. Do not alter the corpus after inspecting scores without recording a dataset version change.
+6. The dataset is small and synthetic; do not generalize scores to real-world documents.

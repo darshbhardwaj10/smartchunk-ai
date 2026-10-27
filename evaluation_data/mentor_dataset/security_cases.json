@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "description": "Security test fixtures only. The current backend normalizer may not implement a prompt-injection scanner or access-control enforcement; report this as not implemented rather than marking these fixtures safe.",
+  "cases": [
+    {
+      "case_id": "SEC-001",
+      "file": "benign_security_training.md",
+      "expected_risk": "benign_quoted_example",
+      "should_warn": false,
+      "focus": "Avoid over-flagging a harmless quoted example."
+    },
+    {
+      "case_id": "SEC-002",
+      "file": "direct_prompt_injection.md",
+      "expected_risk": "direct_instruction_in_document",
+      "should_warn": true,
+      "focus": "Instruction-like content should be treated as untrusted data."
+    },
+    {
+      "case_id": "SEC-003",
+      "file": "unicode_prompt_injection.txt",
+      "expected_risk": "unicode_obfuscated_instruction",
+      "should_warn": true,
+      "focus": "Invisible characters may obscure suspicious text."
+    },
+    {
+      "case_id": "SEC-004",
+      "file": "hidden_html_instruction.html",
+      "expected_risk": "hidden_html_text",
+      "should_warn": true,
+      "focus": "Test whether hidden HTML text is surfaced or flagged during normalization."
+    },
+    {
+      "case_id": "SEC-005",
+      "file": "restricted_source.md",
+      "expected_risk": "restricted_content",
+      "should_warn": true,
+      "focus": "Chunking does not enforce identity or authorization; this fixture tests whether restriction metadata needs to be propagated."
+    }
+  ]
+}

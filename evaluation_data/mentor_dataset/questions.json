@@ -2,61 +2,103 @@
   {
     "question": "What should support staff never ask a user to send?",
     "expected_source": "01_structure_stress_test.md",
-    "expected_topic": "Account access recovery"
+    "expected_topic": "Account access recovery",
+    "question_id": "SE-001",
+    "required_evidence": []
   },
   {
     "question": "What information should be recorded for an incident?",
     "expected_source": "01_structure_stress_test.md",
-    "expected_topic": "First-response checklist"
+    "expected_topic": "First-response checklist",
+    "question_id": "SE-002",
+    "required_evidence": []
   },
   {
     "question": "What does P1 mean for the campus identity provider?",
     "expected_source": "01_structure_stress_test.md",
-    "expected_topic": "Incident priority reference"
+    "expected_topic": "Incident priority reference",
+    "question_id": "SE-003",
+    "required_evidence": []
   },
   {
     "question": "What does the incident identifier normalization function validate?",
     "expected_source": "01_structure_stress_test.md",
-    "expected_topic": "Incident identifier handling"
+    "expected_topic": "Incident identifier handling",
+    "question_id": "SE-004",
+    "required_evidence": []
   },
   {
     "question": "How should users report a missing grade?",
     "expected_source": "01_structure_stress_test.md",
-    "expected_topic": "Frequently asked questions"
+    "expected_topic": "Frequently asked questions",
+    "question_id": "SE-005",
+    "required_evidence": []
   },
   {
     "question": "Which endpoint returns chunk records and metrics?",
     "expected_source": "02_api_integration_guide.md",
-    "expected_topic": "Endpoint reference"
+    "expected_topic": "Endpoint reference",
+    "question_id": "SE-006",
+    "required_evidence": []
   },
   {
     "question": "What form fields are sent to the process endpoint?",
     "expected_source": "02_api_integration_guide.md",
-    "expected_topic": "Request example"
+    "expected_topic": "Request example",
+    "question_id": "SE-007",
+    "required_evidence": []
   },
   {
     "question": "What does the oversized flag indicate?",
     "expected_source": "02_api_integration_guide.md",
-    "expected_topic": "Response contract"
+    "expected_topic": "Response contract",
+    "question_id": "SE-008",
+    "required_evidence": []
   },
   {
     "question": "Which HTTP status represents an unsupported file extension?",
     "expected_source": "02_api_integration_guide.md",
-    "expected_topic": "Error handling"
+    "expected_topic": "Error handling",
+    "question_id": "SE-009",
+    "required_evidence": []
   },
   {
     "question": "What information should not be included in a support ticket?",
     "expected_source": "03_student_data_policy.md",
-    "expected_topic": "Data minimization"
+    "expected_topic": "Data minimization",
+    "question_id": "SE-010",
+    "required_evidence": []
   },
   {
     "question": "How long is the suggested test retention for sanitized diagnostic logs?",
     "expected_source": "03_student_data_policy.md",
-    "expected_topic": "Retention schedule"
+    "expected_topic": "Retention schedule",
+    "question_id": "SE-011",
+    "required_evidence": []
   },
   {
     "question": "What is the correct workflow for handling support data?",
     "expected_source": "03_student_data_policy.md",
-    "expected_topic": "Handling workflow"
+    "expected_topic": "Handling workflow",
+    "question_id": "SE-012",
+    "required_evidence": []
+  },
+  {
+    "question_id": "SE-013",
+    "question": "How long does temporary VPN access last by default?",
+    "expected_source": "04_reference_and_multievidence.md",
+    "expected_topic": "Default access duration",
+    "required_evidence": [
+      "Temporary VPN access expires after 14 calendar days unless renewed."
+    ]
+  },
+  {
+    "question_id": "SE-014",
+    "question": "How long are sanitized diagnostic logs retained?",
+    "expected_source": "04_reference_and_multievidence.md",
+    "expected_topic": "Logging and retention",
+    "required_evidence": [
+      "Sanitized diagnostic logs are retained for 30 days"
+    ]
   }
 ]

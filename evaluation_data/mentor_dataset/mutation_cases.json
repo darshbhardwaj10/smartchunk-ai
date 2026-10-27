@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "description": "Controlled mutations are evaluation inputs. Some cases intentionally probe capabilities not implemented in the current baseline; those must be reported as such, not silently passed.",
+  "cases": [
+    {
+      "case_id": "MUT-001",
+      "name": "Harmless whitespace variation",
+      "document": "01_structure_stress_test.md",
+      "operation": "replace_once",
+      "target": "Support agents should classify each issue, record the affected service, and give users a clear next step.",
+      "replacement": "Support agents should classify   each issue, record the affected service, and give users a clear next step.",
+      "must_preserve": [
+        "record the affected service",
+        "give users a clear next step"
+      ],
+      "expected_removed": [],
+      "capability_required": null,
+      "purpose": "Check whether harmless extra spaces cause unexplained content loss."
+    },
+    {
+      "case_id": "MUT-002",
+      "name": "Repeated notice insertion",
+      "document": "01_structure_stress_test.md",
+      "operation": "append_text",
+      "append_text": "\n\n## Mutation repeated notice\nScheduled maintenance notice: the test portal may be unavailable during the published maintenance window. Save work before maintenance and check the service status page for updates.",
+      "must_preserve": [
+        "Scheduled maintenance notice: the test portal may be unavailable",
+        "Save work before maintenance"
+      ],
+      "expected_removed": [],
+      "capability_required": null,
+      "purpose": "Observe duplication behavior when an exact notice appears more than once."
+    },
+    {
+      "case_id": "MUT-003",
+      "name": "Removed source sentence",
+      "document": "01_structure_stress_test.md",
+      "operation": "replace_once",
+      "target": "Support agents should classify each issue, record the affected service, and give users a clear next step.",
+      "replacement": "",
+      "must_preserve": [
+        "Please compare content, not only chunk counts.",
+        "Record the time, error message, and relevant request or incident identifier."
+      ],
+      "expected_removed": [
+        "Support agents should classify each issue, record the affected service, and give users a clear next step."
+      ],
+      "capability_required": null,
+      "purpose": "Ensure intentional source deletion is distinguishable from a chunker accidentally losing content; the report records the expected removal."
+    },
+    {
+      "case_id": "MUT-004",
+      "name": "Unresolved cross-reference",
+      "document": "04_reference_and_multievidence.md",
+      "operation": "append_text",
+      "append_text": "\n\n## Mutation reference\nFor a special case, see Section 99.9, which is intentionally absent from this document.",
+      "must_preserve": [
+        "Section 99.9",
+        "which is intentionally absent from this document"
+      ],
+      "expected_removed": [],
+      "capability_required": "reference_target_validation",
+      "purpose": "Check whether an explicit link to a missing target can be detected and flagged."
+    },
+    {
+      "case_id": "MUT-005",
+      "name": "Caption separated from table",
+      "document": "04_reference_and_multievidence.md",
+      "operation": "insert_after",
+      "target": "Table 1: Maximum initial access duration for the two roles in this synthetic policy.",
+      "insert_text": "\n\nThis unrelated paragraph is deliberately inserted between the caption and the table. It must not be mistaken for part of the table.",
+      "must_preserve": [
+        "Table 1: Maximum initial access duration",
+        "Student contractor | 7 calendar days",
+        "Staff engineer | 14 calendar days"
+      ],
+      "expected_removed": [],
+      "capability_required": "caption_table_relationship",
+      "purpose": "Probe whether table captions remain explicitly associated with tables after intervening prose is inserted."
+    }
+  ]
+}

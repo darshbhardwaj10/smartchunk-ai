@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "description": "Expected behaviors for testing the local candidate store. These are test scenarios, not claims that external indexes are synchronized.",
+  "scenarios": [
+    {
+      "scenario_id": "SYNC-001",
+      "name": "Valid candidate publishes",
+      "setup": "Create a document and a valid candidate with non-empty normalized text and chunk source metadata.",
+      "action": "Validate then publish candidate.",
+      "expected": [
+        "validation_passes",
+        "candidate_becomes_active",
+        "previous_active_becomes_superseded"
+      ]
+    },
+    {
+      "scenario_id": "SYNC-002",
+      "name": "Invalid candidate must not replace active version",
+      "setup": "Create an active version and a candidate with empty normalized text or no chunks.",
+      "action": "Validate candidate and attempt publication.",
+      "expected": [
+        "validation_fails",
+        "publish_rejected",
+        "old_active_version_unchanged"
+      ]
+    },
+    {
+      "scenario_id": "SYNC-003",
+      "name": "Candidate is not active before validation",
+      "setup": "Create an active version and then prepare a candidate.",
+      "action": "Read SafeSync status before validation.",
+      "expected": [
+        "active_version_still_old",
+        "candidate_status_is_candidate"
+      ]
+    },
+    {
+      "scenario_id": "SYNC-004",
+      "name": "Interrupted candidate build",
+      "setup": "Simulate an error before candidate publication.",
+      "action": "Read the active version.",
+      "expected": [
+        "old_active_version_unchanged"
+      ]
+    }
+  ]
+}

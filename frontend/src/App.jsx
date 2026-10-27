@@ -1,35 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
-
-const API_BASE = (
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
-).replace(/\/$/, "");
-
-const ACCEPTED_FILE_TYPES = ".txt,.md,.html,.htm,.pdf,.docx";
-
-function MetricCard({ label, value, hint }) {
-  return (
-    <div className="metric-card">
-      <span className="metric-label">{label}</span>
-      <strong className="metric-value">{value}</strong>
-      {hint ? <small>{hint}</small> : null}
-    </div>
-  );
-}
-
-function formatBytes(bytes) {
-  if (!Number.isFinite(bytes)) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-}
-
-function errorMessage(error) {
-  return error instanceof Error
-    ? error.message
-    : "An unexpected error occurred.";
-}
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import DocumentStudio from "./components/DocumentStudio.jsx";
+import DocumentChat from "./components/DocumentChat.jsx";
+import SafeSyncDashboard from "./components/SafeSyncDashboard.jsx";
+import IncidentExplorer from "./components/IncidentExplorer.jsx";
+import { apiGet, apiPost, apiPostFile, apiPostJson, API_BASE } from "./services/api.js";
+import { errorMessage } from "./utils/format.js";
 
 export default function App() {
+  const [activeTab, setActiveTab] = useState("workspace");
   const [file, setFile] = useState(null);
   const [strategy, setStrategy] = useState("structure");
   const [chunkSize, setChunkSize] = useState(700);
@@ -41,725 +19,318 @@ export default function App() {
   const [selectedChunkIndex, setSelectedChunkIndex] = useState(0);
   const [busyAction, setBusyAction] = useState("");
   const [error, setError] = useState("");
-  const [health, setHealth] = useState({
-    state: "checking",
-    message: "Checking backend...",
-  });
+  const [notice, setNotice] = useState("");
+  const [health, setHealth] = useState({ state: "checking", message: "Checking backend…" });
+
+  const [documents, setDocuments] = useState([]);
+  const [selectedDocumentId, setSelectedDocumentId] = useState("");
+  const [question, setQuestion] = useState("");
+  const [topK, setTopK] = useState(4);
+  const [qaHistory, setQaHistory] = useState([]);
+
+  const [reuseDocumentId, setReuseDocumentId] = useState(false);
+  const [candidate, setCandidate] = useState(null);
+  const [candidateValidation, setCandidateValidation] = useState(null);
+  const [safeSyncStatus, setSafeSyncStatus] = useState(null);
+
+  const [incidents, setIncidents] = useState([]);
+  const [selectedIncident, setSelectedIncident] = useState(null);
+  const [incidentReplay, setIncidentReplay] = useState(null);
+  const [incidentDocumentId, setIncidentDocumentId] = useState("");
+  const [incidentVersionId, setIncidentVersionId] = useState("");
+  const [incidentVersions, setIncidentVersions] = useState([]);
+  const [incidentType, setIncidentType] = useState("retrieval_regression");
+  const [incidentSummary, setIncidentSummary] = useState("");
+  const [incidentQuestion, setIncidentQuestion] = useState("");
+  const [requiredTerms, setRequiredTerms] = useState("");
+  const [forbiddenTerms, setForbiddenTerms] = useState("");
+
+  const selectedDocument = documents.find((item) => item.document_id === selectedDocumentId) ?? null;
+
+  const refreshDocuments = useCallback(async () => {
+    const payload = await apiGet("/documents");
+    const rows = payload.documents ?? [];
+    setDocuments(rows);
+    setSelectedDocumentId((previous) => {
+      if (previous && rows.some((item) => item.document_id === previous)) return previous;
+      return rows[0]?.document_id ?? "";
+    });
+    return rows;
+  }, []);
+
+  const refreshIncidents = useCallback(async () => {
+    const payload = await apiGet("/incidents");
+    const rows = payload.incidents ?? [];
+    setIncidents(rows);
+    return rows;
+  }, []);
+
+  const refreshIncidentVersions = useCallback(async (documentId) => {
+    if (!documentId) {
+      setIncidentVersions([]);
+      setIncidentVersionId("");
+      return [];
+    }
+    const payload = await apiGet(`/documents/${encodeURIComponent(documentId)}/versions`);
+    const rows = payload.versions ?? [];
+    setIncidentVersions(rows);
+    setIncidentVersionId((previous) => rows.some((item) => item.version_id === previous) ? previous : rows[0]?.version_id ?? "");
+    return rows;
+  }, []);
 
   useEffect(() => {
     let alive = true;
-    const controller = new AbortController();
+    apiGet("/health")
+      .then((data) => { if (alive) setHealth({ state: "online", message: `Backend connected · ${data.version ?? "ready"}` }); })
+      .catch(() => { if (alive) setHealth({ state: "offline", message: "Backend offline — start FastAPI" }); });
+    refreshDocuments().catch(() => {});
+    refreshIncidents().catch(() => {});
+    return () => { alive = false; };
+  }, [refreshDocuments, refreshIncidents]);
 
-    fetch(`${API_BASE}/health`, { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(`Backend responded with HTTP ${response.status}`);
-        }
-        return response.json();
-      })
-      .then((data) => {
-        if (alive) {
-          setHealth({
-            state: "online",
-            message:
-              data.status === "ok"
-                ? "Backend connected"
-                : "Backend response received",
-          });
-        }
-      })
-      .catch((err) => {
-        if (alive && err.name !== "AbortError") {
-          setHealth({
-            state: "offline",
-            message: "Backend offline — start FastAPI",
-          });
-        }
-      });
+  useEffect(() => {
+    if (activeTab === "incidents" && incidentDocumentId) {
+      refreshIncidentVersions(incidentDocumentId).catch((err) => setError(errorMessage(err)));
+    }
+  }, [activeTab, incidentDocumentId, refreshIncidentVersions]);
 
-    return () => {
-      alive = false;
-      controller.abort();
-    };
-  }, []);
+  function clearMessages() {
+    setError("");
+    setNotice("");
+  }
 
-  const chunks = result?.chunks ?? [];
-  const selectedChunk = chunks[selectedChunkIndex] ?? null;
-  const chunkTypes = result?.metrics?.chunk_types ?? {};
-
-  const selectedHeading = useMemo(() => {
-    if (!selectedChunk) return "No chunk selected";
-
-    return selectedChunk.heading_path?.length
-      ? selectedChunk.heading_path.join(" / ")
-      : "No heading detected";
-  }, [selectedChunk]);
-
-  function onSelectFile(event) {
+  function handleFileChange(event) {
     const nextFile = event.target.files?.[0] ?? null;
-
     setFile(nextFile);
     setResult(null);
     setBenchmark(null);
     setNormalizePreview(null);
     setSelectedChunkIndex(0);
-    setError("");
+    setCandidate(null);
+    setCandidateValidation(null);
+    setSafeSyncStatus(null);
+    setQaHistory([]);
+    clearMessages();
   }
 
-  function validateInputs() {
+  function validateChunkInputs() {
     if (!file) return "Choose a document first.";
-
-    if (
-      !Number.isInteger(Number(chunkSize)) ||
-      chunkSize < 200 ||
-      chunkSize > 2000
-    ) {
-      return "Chunk size must be an integer between 200 and 2000 characters.";
-    }
-
-    if (
-      !Number.isInteger(Number(overlap)) ||
-      overlap < 0 ||
-      overlap > 400 ||
-      overlap >= chunkSize
-    ) {
-      return "Overlap must be an integer between 0 and 400, and smaller than chunk size.";
-    }
-
+    if (!Number.isInteger(Number(chunkSize)) || Number(chunkSize) < 200 || Number(chunkSize) > 2000) return "Chunk size must be between 200 and 2000 characters.";
+    if (!Number.isInteger(Number(overlap)) || Number(overlap) < 0 || Number(overlap) > 400 || Number(overlap) >= Number(chunkSize)) return "Overlap must be between 0 and 400 and smaller than chunk size.";
     return "";
   }
 
-  async function postFile(endpoint, fields = {}) {
-    const body = new FormData();
-    body.append("file", file);
-
-    for (const [key, value] of Object.entries(fields)) {
-      body.append(key, String(value));
-    }
-
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-      method: "POST",
-      body,
-    });
-
-    const payload = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      const detail =
-        typeof payload.detail === "string"
-          ? payload.detail
-          : `Request failed with HTTP ${response.status}.`;
-
-      throw new Error(detail);
-    }
-
-    return payload;
+  async function previewNormalization() {
+    if (!file) { setError("Choose a document first."); return; }
+    setBusyAction("normalize"); clearMessages();
+    try {
+      const payload = await apiPostFile("/normalize", file);
+      setNormalizePreview(payload);
+      setNotice("Normalization preview ready.");
+    } catch (err) { setError(errorMessage(err)); }
+    finally { setBusyAction(""); }
   }
 
   async function processDocument() {
-    const validation = validateInputs();
-
-    if (validation) {
-      setError(validation);
-      return;
-    }
-
-    setBusyAction("process");
-    setError("");
-    setBenchmark(null);
-    setNormalizePreview(null);
-    setResult(null);
-    setSelectedChunkIndex(0);
-
+    const validation = validateChunkInputs();
+    if (validation) { setError(validation); return; }
+    setBusyAction("process"); clearMessages(); setBenchmark(null); setSelectedChunkIndex(0);
     try {
-      const payload = await postFile("/process", {
-        strategy,
-        chunk_size: chunkSize,
-        overlap,
-        semantic,
-      });
-
+      const payload = await apiPostFile("/process", file, { strategy, chunk_size: chunkSize, overlap, semantic });
       setResult(payload);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setBusyAction("");
-    }
+      setSelectedDocumentId(payload.document_id ?? "");
+      setQaHistory([]);
+      await refreshDocuments();
+      setActiveTab("workspace");
+      setNotice(`Processed ${payload.filename}. Saved document ${payload.document_id} (${payload.version_id}).`);
+    } catch (err) { setError(errorMessage(err)); }
+    finally { setBusyAction(""); }
   }
 
   async function runBenchmark() {
-    const validation = validateInputs();
-
-    if (validation) {
-      setError(validation);
-      return;
-    }
-
-    setBusyAction("benchmark");
-    setError("");
-
+    const validation = validateChunkInputs();
+    if (validation) { setError(validation); return; }
+    setBusyAction("benchmark"); clearMessages();
     try {
-      const payload = await postFile("/benchmark", {
-        chunk_size: chunkSize,
-        overlap,
-      });
-
+      const payload = await apiPostFile("/benchmark", file, { chunk_size: chunkSize, overlap });
       setBenchmark(payload);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setBusyAction("");
-    }
+      setNotice("Benchmark complete. Both chunk arrays are available below.");
+    } catch (err) { setError(errorMessage(err)); }
+    finally { setBusyAction(""); }
   }
 
-  async function previewNormalization() {
-    if (!file) {
-      setError("Choose a document first.");
-      return;
-    }
-
-    setBusyAction("normalize");
+  function openQAForCurrentResult() {
+    if (result?.document_id) setSelectedDocumentId(result.document_id);
+    setActiveTab("qa");
     setError("");
+  }
 
+  async function askQuestion(event) {
+    event.preventDefault();
+    if (!selectedDocumentId) { setError("Process a document first, then choose it here."); return; }
+    if (!question.trim()) { setError("Enter a question about the selected document."); return; }
+    setBusyAction("qa"); clearMessages();
+    const submittedQuestion = question.trim();
     try {
-      const payload = await postFile("/normalize");
-      setNormalizePreview(payload);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setBusyAction("");
-    }
+      const response = await apiPostJson("/qa/ask", { document_id: selectedDocumentId, question: submittedQuestion, top_k: Number(topK) });
+      setQaHistory((previous) => [...previous, { question: submittedQuestion, ...response }]);
+      setQuestion("");
+      await refreshDocuments().catch(() => {});
+    } catch (err) { setError(errorMessage(err)); }
+    finally { setBusyAction(""); }
   }
 
-  function exportJsonl() {
-    if (!chunks.length) return;
-
-    const content = `${chunks
-      .map((chunk) => JSON.stringify(chunk))
-      .join("\n")}\n`;
-
-    const blob = new Blob([content], {
-      type: "application/x-ndjson;charset=utf-8",
-    });
-
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    const stem = (file?.name || "document")
-      .replace(/\.[^.]+$/, "")
-      .replace(/[^\w-]+/g, "_");
-
-    anchor.href = url;
-    anchor.download = `${stem || "document"}-chunks.jsonl`;
-
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  async function prepareCandidate(event) {
+    event.preventDefault();
+    const validation = validateChunkInputs();
+    if (validation) { setError(validation); return; }
+    if (reuseDocumentId && !selectedDocumentId) { setError("Select an existing document first, or turn off the existing-document option."); return; }
+    setBusyAction("prepare"); clearMessages(); setCandidate(null); setCandidateValidation(null);
+    try {
+      const fields = { strategy, chunk_size: chunkSize, overlap, semantic };
+      if (reuseDocumentId) fields.document_id = selectedDocumentId;
+      const payload = await apiPostFile("/safesync/prepare", file, fields);
+      setCandidate(payload);
+      setSafeSyncStatus(null);
+      setNotice(`Candidate ${payload.version_id} created. It is not active until validation and publication.`);
+      await refreshDocuments();
+    } catch (err) { setError(errorMessage(err)); }
+    finally { setBusyAction(""); }
   }
 
-  const isBusy = Boolean(busyAction);
+  async function validateCandidate() {
+    if (!candidate?.version_id) return;
+    setBusyAction("validate"); clearMessages();
+    try {
+      const response = await apiPost(`/safesync/validate/${encodeURIComponent(candidate.version_id)}`);
+      setCandidateValidation(response);
+      setNotice(response.passed ? "Candidate passed validation." : "Candidate blocked. Review failed checks before publishing.");
+      await refreshIncidents().catch(() => {});
+    } catch (err) { setError(errorMessage(err)); }
+    finally { setBusyAction(""); }
+  }
+
+  async function publishCandidate() {
+    if (!candidate?.version_id || !candidateValidation?.passed) return;
+    setBusyAction("publish"); clearMessages();
+    try {
+      const payload = await apiPost(`/safesync/publish/${encodeURIComponent(candidate.version_id)}`);
+      await refreshDocuments();
+      const status = await apiGet(`/safesync/status/${encodeURIComponent(candidate.document_id)}`);
+      setSafeSyncStatus(status);
+      setNotice(payload.message || "Candidate published.");
+    } catch (err) { setError(errorMessage(err)); }
+    finally { setBusyAction(""); }
+  }
+
+  async function refreshSafeSyncStatus() {
+    const documentId = candidate?.document_id || selectedDocumentId;
+    if (!documentId) { setError("Select or process a document first."); return; }
+    setBusyAction("status"); setError("");
+    try { setSafeSyncStatus(await apiGet(`/safesync/status/${encodeURIComponent(documentId)}`)); }
+    catch (err) { setError(errorMessage(err)); }
+    finally { setBusyAction(""); }
+  }
+
+  async function createIncident(event) {
+    event.preventDefault();
+    if (!incidentDocumentId || !incidentVersionId) { setError("Choose a document and version for the incident."); return; }
+    if (!incidentSummary.trim()) { setError("Enter a short incident summary."); return; }
+    setBusyAction("create-incident"); clearMessages();
+    const details = { top_k: Number(topK) };
+    if (incidentQuestion.trim()) details.question = incidentQuestion.trim();
+    if (requiredTerms.trim()) details.required_evidence_terms = requiredTerms.split("\n").map((item) => item.trim()).filter(Boolean);
+    if (forbiddenTerms.trim()) details.must_not_contain = forbiddenTerms.split("\n").map((item) => item.trim()).filter(Boolean);
+    const version = incidentVersions.find((item) => item.version_id === incidentVersionId);
+    const config = version ? { strategy: version.strategy, chunk_size: version.chunk_size, overlap: version.overlap, semantic: version.semantic } : {};
+    try {
+      const payload = await apiPostJson("/incidents", { document_id: incidentDocumentId, version_id: incidentVersionId, failure_type: incidentType, summary: incidentSummary.trim(), config, details });
+      setIncidentSummary(""); setIncidentQuestion(""); setRequiredTerms(""); setForbiddenTerms("");
+      await refreshIncidents();
+      await openIncident(payload.incident_id);
+      setNotice(`Incident ${payload.incident_id} created.`);
+    } catch (err) { setError(errorMessage(err)); }
+    finally { setBusyAction(""); }
+  }
+
+  async function openIncident(incidentId) {
+    if (!incidentId) return;
+    setBusyAction("incident-detail"); setError(""); setIncidentReplay(null);
+    try {
+      const payload = await apiGet(`/incidents/${encodeURIComponent(incidentId)}`);
+      setSelectedIncident(payload);
+      const replayPayload = await apiGet(`/incidents/${encodeURIComponent(incidentId)}/replays`).catch(() => ({ replays: [] }));
+      setIncidentReplay(replayPayload.replays?.[0]?.result ?? null);
+    } catch (err) { setError(errorMessage(err)); }
+    finally { setBusyAction(""); }
+  }
+
+  async function replayIncident() {
+    if (!selectedIncident?.incident_id) return;
+    setBusyAction("replay"); clearMessages();
+    try {
+      const payload = await apiPost(`/incidents/${encodeURIComponent(selectedIncident.incident_id)}/replay`);
+      setIncidentReplay(payload);
+      await refreshIncidents();
+      setSelectedIncident(await apiGet(`/incidents/${encodeURIComponent(selectedIncident.incident_id)}`));
+      setNotice(payload.resolved ? "Replay completed: all recorded checks passed." : "Replay completed with failing checks. Review the report.");
+    } catch (err) { setError(errorMessage(err)); }
+    finally { setBusyAction(""); }
+  }
+
+  const selectedChunkIndexSafe = useMemo(() => {
+    const length = result?.chunks?.length ?? 0;
+    if (!length) return 0;
+    return Math.max(0, Math.min(selectedChunkIndex, length - 1));
+  }, [result, selectedChunkIndex]);
 
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div className="brand-mark" aria-hidden="true">
-          SC
-        </div>
-
-        <div className="brand-copy">
-          <p className="eyebrow">STRUCTURE-AWARE RAG PREPROCESSOR</p>
-          <h1>
-            SmartChunk <span>AI</span>
-          </h1>
-        </div>
-
-        <div
-          className={`connection connection-${health.state}`}
-          role="status"
-        >
-          <span className="status-dot" />
-          {health.message}
-        </div>
+        <div className="brand-mark" aria-hidden="true">SC</div>
+        <div className="brand-copy"><p className="eyebrow">EVIDENCE-GROUNDED DOCUMENT INTELLIGENCE</p><h1>SmartChunk <span>AI</span></h1></div>
+        <div className={`connection connection-${health.state}`} role="status"><span className="status-dot" />{health.message}</div>
       </header>
 
       <section className="hero">
-        <p className="eyebrow">
-          DOCUMENT INGESTION · NORMALIZATION · CHUNKING
-        </p>
-
-        <h2>
-          Keep document context
-          <br />
-          together, not just characters.
-        </h2>
-
-        <p className="hero-copy">
-          Normalize supported documents into Markdown, inspect
-          structure-aware chunks, compare a fixed-size baseline, and export
-          metadata-rich JSONL.
-        </p>
-
-        <div className="pipeline-chips" aria-label="Processing steps">
-          <span>01&nbsp; Normalize</span>
-          <b aria-hidden="true">→</b>
-          <span>02&nbsp; Chunk</span>
-          <b aria-hidden="true">→</b>
-          <span>03&nbsp; Evaluate</span>
-        </div>
+        <p className="eyebrow">NORMALIZE · CHUNK · QUESTION · VALIDATE · REPLAY</p>
+        <h2>Make document knowledge<br />inspectable and reliable.</h2>
+        <p className="hero-copy">Prepare structure-aware chunks, ask questions grounded in a selected document, validate candidate knowledge-base updates and replay failed checks.</p>
+        <div className="pipeline-chips"><span>01 Normalize</span><b>→</b><span>02 Chunk</span><b>→</b><span>03 Retrieve</span><b>→</b><span>04 Validate</span></div>
       </section>
 
-      <section className="workspace">
-        <aside className="panel controls-panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">WORKSPACE</p>
-              <h3>Process a document</h3>
-            </div>
-            <span className="step-label">STEP 01</span>
-          </div>
+      <nav className="main-nav" aria-label="SmartChunk sections">
+        {[["workspace", "Document Studio"], ["qa", "Document Q&A"], ["safesync", "SafeSync"], ["incidents", "Incident Replay"]].map(([id, label]) => (
+          <button key={id} type="button" className={`nav-tab ${activeTab === id ? "active" : ""}`} onClick={() => { setActiveTab(id); clearMessages(); }}>{label}</button>
+        ))}
+      </nav>
 
-          <label className="upload-zone">
-            <input
-              type="file"
-              accept={ACCEPTED_FILE_TYPES}
-              onChange={onSelectFile}
-            />
-            <span className="upload-icon" aria-hidden="true">
-              ↑
-            </span>
-            <strong>{file ? file.name : "Choose a document"}</strong>
-            <small>
-              {file
-                ? `${formatBytes(file.size)} · Ready to process`
-                : "TXT, Markdown, HTML, PDF, or DOCX · Max 10 MB"}
-            </small>
-          </label>
+      {error ? <div className="global-alert alert-error" role="alert"><strong>Something needs attention</strong><span>{error}</span><button type="button" className="alert-close" onClick={() => setError("")} aria-label="Dismiss error">×</button></div> : null}
+      {notice ? <div className="global-alert alert-success" role="status"><strong>Done</strong><span>{notice}</span><button type="button" className="alert-close" onClick={() => setNotice("")} aria-label="Dismiss notification">×</button></div> : null}
 
-          <label className="field-label" htmlFor="strategy">
-            Chunking strategy
-          </label>
+      {activeTab === "workspace" ? (
+        <DocumentStudio
+          uploadProps={{ file, onFileChange: handleFileChange, strategy, setStrategy, chunkSize, setChunkSize, overlap, setOverlap, semantic, setSemantic, busyAction, onProcess: processDocument, onPreview: previewNormalization, onBenchmark: runBenchmark }}
+          explorerProps={{ result, selectedChunkIndex: selectedChunkIndexSafe, setSelectedChunkIndex, onOpenQA: openQAForCurrentResult }}
+          normalizePreview={normalizePreview}
+          setStrategy={setStrategy}
+          benchmark={benchmark}
+        />
+      ) : null}
 
-          <select
-            id="strategy"
-            value={strategy}
-            onChange={(event) => setStrategy(event.target.value)}
-          >
-            <option value="structure">SmartChunk — structure-aware</option>
-            <option value="fixed">Baseline — fixed-size</option>
-          </select>
+      {activeTab === "qa" ? (
+        <DocumentChat documents={documents} selectedDocumentId={selectedDocumentId} setSelectedDocumentId={setSelectedDocumentId} selectedDocument={selectedDocument} question={question} setQuestion={setQuestion} topK={topK} setTopK={setTopK} qaHistory={qaHistory} setQaHistory={setQaHistory} busyAction={busyAction} onAsk={askQuestion} />
+      ) : null}
 
-          <div className="form-grid">
-            <label>
-              <span className="field-label">Chunk size (chars)</span>
-              <input
-                type="number"
-                min="200"
-                max="2000"
-                step="50"
-                value={chunkSize}
-                onChange={(event) => setChunkSize(Number(event.target.value))}
-              />
-            </label>
+      {activeTab === "safesync" ? (
+        <SafeSyncDashboard file={file} onFileChange={handleFileChange} documents={documents} selectedDocumentId={selectedDocumentId} setSelectedDocumentId={setSelectedDocumentId} selectedDocument={selectedDocument} strategy={strategy} setStrategy={setStrategy} chunkSize={chunkSize} setChunkSize={setChunkSize} overlap={overlap} setOverlap={setOverlap} semantic={semantic} setSemantic={setSemantic} reuseDocumentId={reuseDocumentId} setReuseDocumentId={setReuseDocumentId} candidate={candidate} candidateValidation={candidateValidation} safeSyncStatus={safeSyncStatus} busyAction={busyAction} onPrepare={prepareCandidate} onValidate={validateCandidate} onPublish={publishCandidate} onRefreshStatus={refreshSafeSyncStatus} />
+      ) : null}
 
-            <label>
-              <span className="field-label">Overlap (chars)</span>
-              <input
-                type="number"
-                min="0"
-                max="400"
-                step="10"
-                value={overlap}
-                onChange={(event) => setOverlap(Number(event.target.value))}
-              />
-            </label>
-          </div>
+      {activeTab === "incidents" ? (
+        <IncidentExplorer documents={documents} incidentDocumentId={incidentDocumentId} setIncidentDocumentId={setIncidentDocumentId} incidentVersions={incidentVersions} incidentVersionId={incidentVersionId} setIncidentVersionId={setIncidentVersionId} incidentType={incidentType} setIncidentType={setIncidentType} incidentSummary={incidentSummary} setIncidentSummary={setIncidentSummary} incidentQuestion={incidentQuestion} setIncidentQuestion={setIncidentQuestion} requiredTerms={requiredTerms} setRequiredTerms={setRequiredTerms} forbiddenTerms={forbiddenTerms} setForbiddenTerms={setForbiddenTerms} incidents={incidents} selectedIncident={selectedIncident} incidentReplay={incidentReplay} busyAction={busyAction} onCreateIncident={createIncident} onRefreshIncidents={() => refreshIncidents().catch((err) => setError(errorMessage(err)))} onOpenIncident={openIncident} onReplayIncident={replayIncident} />
+      ) : null}
 
-          <label className="toggle-row">
-            <span>
-              <strong>Semantic boundary mode</strong>
-              <small>
-                Optional embeddings; requires extra dependencies and a model
-                download.
-              </small>
-            </span>
-
-            <input
-              type="checkbox"
-              checked={semantic}
-              onChange={(event) => setSemantic(event.target.checked)}
-            />
-          </label>
-
-          <button
-            className="button button-primary"
-            type="button"
-            disabled={isBusy || !file}
-            onClick={processDocument}
-          >
-            {busyAction === "process"
-              ? "Processing..."
-              : "Process document"}
-            <span aria-hidden="true">→</span>
-          </button>
-
-          <button
-            className="button button-secondary"
-            type="button"
-            disabled={isBusy || !file}
-            onClick={previewNormalization}
-          >
-            {busyAction === "normalize"
-              ? "Normalizing..."
-              : "Preview normalized Markdown"}
-          </button>
-
-          <button
-            className="button button-secondary"
-            type="button"
-            disabled={isBusy || !file}
-            onClick={runBenchmark}
-          >
-            {busyAction === "benchmark"
-              ? "Benchmarking..."
-              : "Compare against baseline"}
-          </button>
-
-          {error ? (
-            <div className="error-box" role="alert">
-              {error}
-            </div>
-          ) : null}
-
-          <p className="fine-print">
-            This prototype sends the selected document to your configured
-            backend. Use non-sensitive test documents during the hackathon.
-          </p>
-        </aside>
-
-        <div className="results-column">
-          <section className="panel result-panel">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">OUTPUT</p>
-                <h3>Chunk explorer</h3>
-              </div>
-              <span className="step-label">STEP 02</span>
-            </div>
-
-            {!result ? (
-              <div className="empty-state">
-                <div className="empty-icon" aria-hidden="true">
-                  ▤
-                </div>
-                <strong>Your chunks will appear here</strong>
-                <p>
-                  Choose a document and process it to inspect chunk text,
-                  heading paths, source metadata, and content types.
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="file-summary">
-                  <strong>{result.filename}</strong>
-                  <span>
-                    {result.normalization?.source_format || "unknown format"}{" "}
-                    →{" "}
-                    {result.normalization?.intermediate_format || "markdown"}
-                  </span>
-                </div>
-
-                <div className="metric-grid">
-                  <MetricCard
-                    label="Total chunks"
-                    value={result.metrics?.chunk_count ?? chunks.length}
-                  />
-                  <MetricCard
-                    label="Average chars"
-                    value={result.metrics?.average_characters ?? 0}
-                  />
-                  <MetricCard
-                    label="Oversized chunks"
-                    value={result.metrics?.oversized_chunk_count ?? 0}
-                  />
-                </div>
-
-                {result.normalization?.warnings?.length ? (
-                  <div className="warning-box">
-                    <strong>Extraction warnings</strong>
-                    {result.normalization.warnings.map((warning, index) => (
-                      <p key={`${index}-${warning}`}>{warning}</p>
-                    ))}
-                  </div>
-                ) : null}
-
-                <div className="type-summary" aria-label="Chunk types">
-                  {Object.entries(chunkTypes).map(([type, count]) => (
-                    <span className="type-chip" key={type}>
-                      {type}
-                      <b>{count}</b>
-                    </span>
-                  ))}
-                </div>
-
-                <div className="chunk-layout">
-                  <div className="chunk-list" aria-label="Generated chunks">
-                    {chunks.map((chunk, index) => (
-                      <button
-                        className={`chunk-item ${
-                          selectedChunkIndex === index ? "selected" : ""
-                        }`}
-                        type="button"
-                        key={chunk.chunk_id ?? index}
-                        onClick={() => setSelectedChunkIndex(index)}
-                      >
-                        <span className="chunk-number">
-                          {String(index + 1).padStart(2, "0")}
-                        </span>
-
-                        <span className="chunk-item-copy">
-                          <strong>
-                            {chunk.heading_path?.at(-1) ||
-                              chunk.chunk_type ||
-                              `Chunk ${index + 1}`}
-                          </strong>
-                          <small>
-                            {chunk.char_count ?? chunk.text?.length ?? 0} chars
-                            {" · "}
-                            {chunk.chunk_type || "text"}
-                            {chunk.oversized ? " · oversized" : ""}
-                          </small>
-                        </span>
-
-                        <span className="chunk-arrow" aria-hidden="true">
-                          ›
-                        </span>
-                      </button>
-                    ))}
-
-                    {!chunks.length ? (
-                      <p className="muted">No chunks were generated.</p>
-                    ) : null}
-                  </div>
-
-                  <div className="chunk-detail">
-                    {selectedChunk ? (
-                      <>
-                        <div className="detail-top">
-                          <span className="type-pill">
-                            {selectedChunk.chunk_type || "text"}
-                          </span>
-                          <span className="char-count">
-                            {selectedChunk.char_count ??
-                              selectedChunk.text?.length ??
-                              0}{" "}
-                            characters
-                          </span>
-                        </div>
-
-                        <h4>
-                          {selectedChunk.heading_path?.at(-1) ||
-                            "Untitled section"}
-                        </h4>
-
-                        <p className="breadcrumb">{selectedHeading}</p>
-                        <pre>{selectedChunk.text || ""}</pre>
-
-                        <div className="metadata-grid">
-                          <span>Source file</span>
-                          <strong>
-                            {selectedChunk.source?.file || "Unknown"}
-                          </strong>
-
-                          <span>Location</span>
-                          <strong>
-                            {selectedChunk.source?.location || "Unknown"}
-                          </strong>
-
-                          {selectedChunk.source?.page ? (
-                            <>
-                              <span>Page</span>
-                              <strong>{selectedChunk.source.page}</strong>
-                            </>
-                          ) : null}
-
-                          <span>Parent ID</span>
-                          <strong>{selectedChunk.parent_id || "None"}</strong>
-
-                          <span>Oversized</span>
-                          <strong>
-                            {selectedChunk.oversized
-                              ? "Yes (kept intact)"
-                              : "No"}
-                          </strong>
-                        </div>
-                      </>
-                    ) : (
-                      <p className="muted">No chunk selected.</p>
-                    )}
-                  </div>
-                </div>
-
-                <button
-                  className="button button-secondary export-button"
-                  type="button"
-                  disabled={!chunks.length}
-                  onClick={exportJsonl}
-                >
-                  ↓ Export chunks as JSONL
-                </button>
-              </>
-            )}
-          </section>
-
-          {normalizePreview ? (
-            <section className="panel">
-              <div className="panel-heading">
-                <div>
-                  <p className="eyebrow">NORMALIZATION</p>
-                  <h3>Markdown preview</h3>
-                </div>
-                <span className="step-label">INTERMEDIATE</span>
-              </div>
-
-              <p className="muted">
-                {normalizePreview.filename} ·{" "}
-                {normalizePreview.normalization?.normalized_character_count ??
-                  0}{" "}
-                normalized characters
-                {normalizePreview.preview_truncated
-                  ? " · preview truncated"
-                  : ""}
-              </p>
-
-              {normalizePreview.normalization?.warnings?.map(
-                (warning, index) => (
-                  <div className="warning-box" key={`${index}-${warning}`}>
-                    {warning}
-                  </div>
-                )
-              )}
-
-              <pre className="markdown-preview">
-                {normalizePreview.markdown_preview || ""}
-              </pre>
-            </section>
-          ) : null}
-
-          <section className="panel benchmark-panel">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">EVALUATION</p>
-                <h3>Baseline benchmark</h3>
-              </div>
-              <span className="step-label">STEP 03</span>
-            </div>
-
-            {!benchmark ? (
-              <p className="muted">
-                Run “Compare against baseline” to calculate metrics for the
-                same document using both strategies.
-              </p>
-            ) : (
-              <>
-                <div className="benchmark-grid">
-                  {[
-                    {
-                      label: "FIXED-SIZE BASELINE",
-                      data: benchmark.baseline,
-                      className: "",
-                    },
-                    {
-                      label: "SMARTCHUNK",
-                      data: benchmark.smartchunk,
-                      className: "smart-card",
-                    },
-                  ].map(({ label, data, className }) => {
-                    const average = Number(data?.average_characters) || 0;
-                    const percentage = Math.min(
-                      100,
-                      (average / Math.max(1, Number(chunkSize) || 1)) * 100
-                    );
-
-                    return (
-                      <div
-                        className={`benchmark-card ${className}`}
-                        key={label}
-                      >
-                        <span>{label}</span>
-                        <strong>{data?.chunk_count ?? 0} chunks</strong>
-                        <small>Average {average} chars</small>
-                        <div className="bar-track">
-                          <i style={{ width: `${percentage}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="comparison-table-wrap">
-                  <table className="comparison-table">
-                    <thead>
-                      <tr>
-                        <th>Metric</th>
-                        <th>Baseline</th>
-                        <th>SmartChunk</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>Min characters</td>
-                        <td>{benchmark.baseline?.min_characters ?? 0}</td>
-                        <td>{benchmark.smartchunk?.min_characters ?? 0}</td>
-                      </tr>
-                      <tr>
-                        <td>Max characters</td>
-                        <td>{benchmark.baseline?.max_characters ?? 0}</td>
-                        <td>{benchmark.smartchunk?.max_characters ?? 0}</td>
-                      </tr>
-                      <tr>
-                        <td>Oversized chunks</td>
-                        <td>
-                          {benchmark.baseline?.oversized_chunk_count ?? 0}
-                        </td>
-                        <td>
-                          {benchmark.smartchunk?.oversized_chunk_count ?? 0}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Duplicate rate</td>
-                        <td>
-                          {(
-                            (Number(benchmark.baseline?.duplicate_rate) || 0) *
-                            100
-                          ).toFixed(1)}
-                          %
-                        </td>
-                        <td>
-                          {(
-                            (Number(benchmark.smartchunk?.duplicate_rate) ||
-                              0) * 100
-                          ).toFixed(1)}
-                          %
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <p className="benchmark-note">
-                  {benchmark.note || "Benchmark completed."}
-                </p>
-              </>
-            )}
-          </section>
-        </div>
-      </section>
-
-      <footer>
-        <span>SMARTCHUNK AI</span>
-        <span>Hackathon prototype · Normalize → Chunk → Evaluate</span>
-      </footer>
+      <footer><span>SMARTCHUNK AI</span><span>Document intelligence · Q&A · SafeSync · Incident Replay</span><span>API: {API_BASE}</span></footer>
     </main>
   );
 }

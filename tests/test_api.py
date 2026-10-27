@@ -1,8 +1,3 @@
-from fastapi.testclient import TestClient
-
-from backend.main import app
-
-client = TestClient(app)
 SAMPLE_MARKDOWN = b"""# Student Handbook
 
 ## Attendance Rules
@@ -20,7 +15,7 @@ def answer():
 """
 
 
-def test_root_endpoint():
+def test_root_endpoint(client):
     response = client.get("/")
     assert response.status_code == 200
     payload = response.json()
@@ -28,13 +23,13 @@ def test_root_endpoint():
     assert payload["health"] == "/health"
 
 
-def test_health_endpoint():
+def test_health_endpoint(client):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
 
 
-def test_normalize_markdown_endpoint():
+def test_normalize_markdown_endpoint(client):
     response = client.post(
         "/normalize",
         files={"file": ("handbook.md", SAMPLE_MARKDOWN, "text/markdown")},
@@ -47,7 +42,7 @@ def test_normalize_markdown_endpoint():
     assert payload["preview_truncated"] is False
 
 
-def test_process_structure_strategy():
+def test_process_structure_strategy(client):
     response = client.post(
         "/process",
         data={"strategy": "structure", "chunk_size": "700", "overlap": "80", "semantic": "false"},
@@ -63,7 +58,7 @@ def test_process_structure_strategy():
     assert any(chunk["chunk_type"] == "code" for chunk in payload["chunks"])
 
 
-def test_process_fixed_strategy():
+def test_process_fixed_strategy(client):
     response = client.post(
         "/process",
         data={"strategy": "fixed", "chunk_size": "700", "overlap": "80", "semantic": "false"},
@@ -76,7 +71,7 @@ def test_process_fixed_strategy():
     assert payload["metrics"]["chunk_count"] == len(payload["chunks"])
 
 
-def test_benchmark_endpoint():
+def test_benchmark_endpoint(client):
     response = client.post(
         "/benchmark",
         data={"chunk_size": "700", "overlap": "80"},
@@ -89,7 +84,7 @@ def test_benchmark_endpoint():
     assert payload["smartchunk"]["chunk_count"] >= 1
 
 
-def test_unsupported_extension_returns_415():
+def test_unsupported_extension_returns_415(client):
     response = client.post(
         "/process",
         data={"strategy": "structure"},
@@ -98,7 +93,7 @@ def test_unsupported_extension_returns_415():
     assert response.status_code == 415
 
 
-def test_empty_file_returns_400():
+def test_empty_file_returns_400(client):
     response = client.post(
         "/process",
         data={"strategy": "structure"},
@@ -107,7 +102,7 @@ def test_empty_file_returns_400():
     assert response.status_code == 400
 
 
-def test_invalid_chunk_size_returns_422():
+def test_invalid_chunk_size_returns_422(client):
     response = client.post(
         "/process",
         data={"strategy": "structure", "chunk_size": "100", "overlap": "10"},
@@ -116,7 +111,7 @@ def test_invalid_chunk_size_returns_422():
     assert response.status_code == 422
 
 
-def test_invalid_overlap_returns_422():
+def test_invalid_overlap_returns_422(client):
     response = client.post(
         "/benchmark",
         data={"chunk_size": "300", "overlap": "300"},

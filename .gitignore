@@ -1,16 +1,19 @@
-cat >> .gitignore <<'EOF'
-
-# Python generated files
+# Python
+.venv/
+**/.venv/
 __pycache__/
 *.py[cod]
-.venv/
+.pytest_cache/
 
-# Frontend generated files
+# Frontend dependencies and build output
 frontend/node_modules/
 frontend/dist/
 
-# Environment secrets
+# Secrets and local environment
 .env
 .env.*
 !.env.example
-EOF
+
+# Local application database and storage
+.smartchunk_data/
+*.db

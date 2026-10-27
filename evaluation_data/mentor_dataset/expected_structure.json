@@ -45,7 +45,32 @@
       ],
       "expected_duplicate_topic": "Repeated content example",
       "purpose": "Policy-style content for heading, list, table, and duplicate checks."
+    },
+    "04_reference_and_multievidence.md": {
+      "expected_headings": [
+        "Default access duration",
+        "Renewal exception",
+        "Extension approval record",
+        "Access duration by role",
+        "Logging and retention",
+        "Explicit reference"
+      ],
+      "expected_types": [
+        "table"
+      ],
+      "purpose": "Synthetic multi-evidence dataset for cross-section references, role-specific durations, exceptions, and retention context."
     }
   },
-  "scoring_guidance": "Do not expect perfect scores. Read README_DATASET.md for the definitions of the metrics."
+  "scoring_guidance": "Do not expect perfect scores. Read README_DATASET.md for the definitions of the metrics.",
+  "source_element_checks": {
+    "note": "Expected text fragments are verification anchors, not a full source-to-chunk provenance ledger.",
+    "required_fragments": {
+      "04_reference_and_multievidence.md": [
+        "Temporary VPN access expires after 14 calendar days unless renewed.",
+        "Employees assigned to a documented high-priority incident may receive one seven-day extension.",
+        "Every extension record must include the ticket identifier, the approver's role, the approval date, and the revised expiry date.",
+        "Sanitized diagnostic logs are retained for 30 days"
+      ]
+    }
+  }
 }

@@ -1,51 +1,54 @@
 {
-  "dataset_type": "synthetic document chunking evaluation corpus",
-  "default_chunk_size_characters": 700,
-  "default_overlap_characters": 80,
-  "documents": {
-    "01_structure_stress_test.md": {
-      "expected_headings": [
-        "Incident priority reference",
-        "Incident identifier handling",
-        "First-response checklist",
-        "Account access recovery",
-        "Frequently asked questions"
-      ],
-      "expected_types": [
-        "table",
-        "code",
-        "list"
-      ],
-      "expected_duplicate_topic": "Repeated notice test",
-      "purpose": "Stress test for structures near chunk boundaries; table and code blocks are intentionally long."
+  "name": "SmartChunk Evaluation Rubric",
+  "dataset": "Synthetic test corpus; real-world generalization is not implied.",
+  "metrics": [
+    {
+      "name": "Structural integrity",
+      "definition": "Fraction of source table, list and fenced-code blocks whose complete normalized text appears in at least one generated chunk."
     },
-    "02_api_integration_guide.md": {
-      "expected_headings": [
-        "Endpoint reference",
-        "Request example",
-        "Response contract",
-        "Error handling"
-      ],
-      "expected_types": [
-        "table",
-        "code"
-      ],
-      "purpose": "Technical API documentation with a table and code examples."
+    {
+      "name": "Size compliance",
+      "definition": "Fraction of output chunks not flagged oversized; this is a size check, not an accuracy score."
     },
-    "03_student_data_policy.md": {
-      "expected_headings": [
-        "Data minimization",
-        "Roles and responsibilities",
-        "Retention schedule",
-        "Handling workflow"
-      ],
-      "expected_types": [
-        "table",
-        "list"
-      ],
-      "expected_duplicate_topic": "Repeated content example",
-      "purpose": "Policy-style content for heading, list, table, and duplicate checks."
+    {
+      "name": "Source metadata coverage",
+      "definition": "Fraction of chunks containing both source filename and source location."
+    },
+    {
+      "name": "Expected source/topic Hit@3",
+      "definition": "For each labelled single-source question, whether a relevant chunk for the expected source and topic appears among the top three results."
+    },
+    {
+      "name": "MRR@20",
+      "definition": "Mean reciprocal rank of the first expected source/topic match within the top twenty lexical retrieval results; zero when none appears in the ranked results."
+    },
+    {
+      "name": "Evidence Coverage@k",
+      "definition": "Fraction of manually labelled required evidence text spans found in the top-k retrieved chunks."
+    },
+    {
+      "name": "Evidence Completeness@k",
+      "definition": "Fraction of multi-evidence questions for which all annotated required evidence spans are found in the top-k retrieved chunks."
+    },
+    {
+      "name": "Processing time",
+      "definition": "Median observed chunking time over repeated local runs; environment and settings must be recorded."
+    },
+    {
+      "name": "Mutation assertions",
+      "definition": "Whether required text remains present, intentionally removed text is absent, and structural invariants remain satisfied for a controlled input mutation."
+    },
+    {
+      "name": "Security warning signal",
+      "definition": "Whether the current normalizer reports a security-specific warning for a labelled suspicious fixture. No warning is not evidence of safety."
     }
-  },
-  "scoring_guidance": "Do not expect perfect scores. Read README_DATASET.md for the definitions of the metrics."
+  ],
+  "fair_comparison": [
+    "Use the same source document, chunk size, overlap and question set for both strategies.",
+    "Manually verify every expected evidence span against the source document.",
+    "Report improvements, regressions, oversized chunks, warnings and unsupported capabilities.",
+    "Do not interpret lexical retrieval metrics as semantic retrieval or generated-answer accuracy.",
+    "Do not claim a security scanner exists if the application does not expose security-specific warnings.",
+    "Record the Git commit, environment and command used for every published report."
+  ]
 }

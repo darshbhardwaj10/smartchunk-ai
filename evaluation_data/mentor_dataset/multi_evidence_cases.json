@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "description": "Manually check every required_evidence snippet against the source document before using results in a report.",
+  "top_k_default": 3,
+  "cases": [
+    {
+      "question_id": "ME-001",
+      "question": "What is the default temporary VPN access duration and what exception can extend it?",
+      "expected_source": "04_reference_and_multievidence.md",
+      "expected_topic": "Renewal exception",
+      "required_evidence": [
+        {
+          "evidence_id": "vpn_default_duration",
+          "text": "Temporary VPN access expires after 14 calendar days unless renewed."
+        },
+        {
+          "evidence_id": "vpn_extension_exception",
+          "text": "Employees assigned to a documented high-priority incident may receive one seven-day extension."
+        },
+        {
+          "evidence_id": "service_owner_approval",
+          "text": "The exception applies only after the service owner approves the extension."
+        }
+      ]
+    },
+    {
+      "question_id": "ME-002",
+      "question": "Which information must be recorded for an extension, and is a ticket ID by itself enough?",
+      "expected_source": "04_reference_and_multievidence.md",
+      "expected_topic": "Extension approval record",
+      "required_evidence": [
+        {
+          "evidence_id": "required_extension_fields",
+          "text": "Every extension record must include the ticket identifier, the approver's role, the approval date, and the revised expiry date."
+        },
+        {
+          "evidence_id": "ticket_not_enough",
+          "text": "A ticket identifier without an approval record is not sufficient evidence that an extension was authorized."
+        }
+      ]
+    },
+    {
+      "question_id": "ME-003",
+      "question": "Compare the initial access duration for a student contractor and a staff engineer.",
+      "expected_source": "04_reference_and_multievidence.md",
+      "expected_topic": "Access duration by role",
+      "required_evidence": [
+        {
+          "evidence_id": "contractor_duration",
+          "text": "Student contractor | 7 calendar days | Faculty sponsor"
+        },
+        {
+          "evidence_id": "engineer_duration",
+          "text": "Staff engineer | 14 calendar days | Service owner"
+        }
+      ]
+    },
+    {
+      "question_id": "ME-004",
+      "question": "What sensitive values must support logs omit, and when does the 30-day retention period start?",
+      "expected_source": "04_reference_and_multievidence.md",
+      "expected_topic": "Logging and retention",
+      "required_evidence": [
+        {
+          "evidence_id": "log_redaction",
+          "text": "Support logs must omit passwords, API keys and session cookies."
+        },
+        {
+          "evidence_id": "retention_start",
+          "text": "Sanitized diagnostic logs are retained for 30 days, measured from the date the incident is closed."
+        }
+      ]
+    }
+  ]
+}

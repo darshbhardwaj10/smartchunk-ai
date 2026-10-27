@@ -1,0 +1,5 @@
+# Generated evaluation output; commit a specific report only when intentionally publishing it.
+/results/*.json
+/results/*.csv
+/results/*.html
+/results/*.log
